@@ -1,9 +1,11 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import DatePicker from "react-datepicker"
 import moment from "moment"
 
 import "react-datepicker/dist/react-datepicker.css"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import API_ENDPOINT from "../api/api-endpoint"
+import Swal from "sweetalert2"
 
 export default function Register() {
     const initialErrorMsg = {
@@ -22,30 +24,92 @@ export default function Register() {
         hp: "",
         tgl_lahir: "",
         jenis_kelamin: 0,
-        password: ""
+        password: "",
+        grup: "member"
     })
     const [errorMsg, setErrorMsg] = useState(initialErrorMsg)
     const [date, setDate] = useState('')
+    const navigate = useNavigate()
+
+    useEffect(() => {
+        if (localStorage.getItem('token')) {
+            navigate('/dashboard')
+        }
+    }, [])
+
     const handleInputChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value })
+        if (e.target.name === "jenis_kelamin") {
+            setForm({ ...form, jenis_kelamin: parseInt(e.target.value) })
+        } else {
+            setForm({ ...form, [e.target.name]: e.target.value })
+        }
     }
+
     const handleDatepickerChange = (date) => {
         const formatedDate = moment(date).format('YYYY-MM-DD')
         setForm({ ...form, tgl_lahir: formatedDate })
         setDate(date)
     }
-    const handleFormSubmit = (e) => {
+
+    const handleFormSubmit = async (e) => {
         e.preventDefault()
         setErrorMsg(initialErrorMsg)
+
+        let error = false
+
         if (form.jenis_kelamin === 0) {
             setErrorMsg({ ...errorMsg, jenis_kelamin: 'Please select your gender' })
+            error = true
         }
         if (form.password.length < 8) {
             setErrorMsg({ ...errorMsg, password: 'Password must has at least 8 characters' })
+            error = true
         }
-        console.log(errorMsg);
-        console.log(form.password.length);
+
+        if (!error) {
+            await fetch(API_ENDPOINT.REGISTER, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(form)
+            })
+                .then((res) => res.json())
+                .then((resJson) => {
+                    if (resJson.status.kode === "success") {
+                        Swal.fire(
+                            'Registration success',
+                            resJson.status.keterangan,
+                            'success',
+                        ).then(() => {
+                            navigate('/', { state: { email: resJson.data.email } })
+                        })
+                    } else {
+                        Swal.fire(
+                            'Registration failed',
+                            resJson.status.keterangan,
+                            'error',
+                        )
+                    }
+                })
+                .catch(() => {
+                    if (!window.navigator.onLine) {
+                        Swal.fire(
+                            'Registration failed',
+                            'Make sure your internet is connected!',
+                            'error',
+                        );
+                    } else {
+                        Swal.fire(
+                            'Registration failed',
+                            '',
+                            'error',
+                        );
+                    }
+                })
+        }
     }
+
     return (
         <div>
             <h2 className="mb-4">Register</h2>
@@ -99,12 +163,12 @@ export default function Register() {
                         <span className="birth valid-alert text-danger"><small>{errorMsg.tgl_lahir}</small></span>
                     </div>
                 </div>
-                <div className="mb-3">
+                <div className="mb-4">
                     <label htmlFor="password" className="form-label">Password</label>
                     <input name="password" id="password" type="password" className="form-control form-control-sm" aria-label="Password" onChange={handleInputChange} value={form.password} required />
                     <span className="password valid-alert text-danger"><small>{errorMsg.password}</small></span>
                 </div>
-                <button type="submit" className="btn btn-primary me-3">Register</button> <Link to="/">Login</Link>
+                <button type="submit" className="btn btn-primary me-3 px-4">Register</button> Already have an account? <Link to="/">Log in</Link>
             </form>
         </div>
     )
